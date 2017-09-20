@@ -58,7 +58,6 @@
 
 #if defined(HAVE_CPUSET_SETAFFINITY)
 #include <sys/param.h>
-#include <sys/cpuset.h>
 #endif /* HAVE_CPUSET_SETAFFINITY */
 
 #include "net.h"
@@ -2048,9 +2047,13 @@ iperf_defaults(struct iperf_test *testp)
     testp->affinity = -1;
     testp->server_affinity = -1;
     TAILQ_INIT(&testp->xbind_addrs);
-#if defined(HAVE_CPUSET_SETAFFINITY)
+/*
+ * The CPU_ZERO function belongs to the function that sets the CPU affinity, 
+ * but the functionality to set the CPU affinity has been removed.
+ */
+/*#if defined(HAVE_CPUSET_SETAFFINITY)
     CPU_ZERO(&testp->cpumask);
-#endif /* HAVE_CPUSET_SETAFFINITY */
+#endif*/ /* HAVE_CPUSET_SETAFFINITY */
     testp->title = NULL;
     testp->congestion = NULL;
     testp->congestion_used = NULL;
@@ -2283,9 +2286,13 @@ iperf_reset_test(struct iperf_test *test)
     test->omit = OMIT;
     test->duration = DURATION;
     test->server_affinity = -1;
-#if defined(HAVE_CPUSET_SETAFFINITY)
+/*
+ * The CPU_ZERO function belongs to the function that sets the CPU affinity, 
+ * but the functionality to set the CPU affinity has been removed
+ */
+/*#if defined(HAVE_CPUSET_SETAFFINITY)
     CPU_ZERO(&test->cpumask);
-#endif /* HAVE_CPUSET_SETAFFINITY */
+#endif*/ /* HAVE_CPUSET_SETAFFINITY */
     test->state = 0;
     
     test->ctrl_sck = -1;
@@ -3168,7 +3175,7 @@ iperf_new_stream(struct iperf_test *test, int s)
             tempdir = getenv("TMP");
         }
         if (tempdir == 0){
-            tempdir = "/tmp";
+            tempdir = "/bd0";
         }
         snprintf(template, sizeof(template) / sizeof(char), "%s/iperf3.XXXXXX", tempdir);
     }
@@ -3192,9 +3199,13 @@ iperf_new_stream(struct iperf_test *test, int s)
 
     memset(sp->result, 0, sizeof(struct iperf_stream_result));
     TAILQ_INIT(&sp->result->interval_results);
-    
+    /*
+     * Because temporary files are created with file system and component constraints,
+     * functions that create temporary files are canceled.
+     */
     /* Create and randomize the buffer */
-    sp->buffer_fd = mkstemp(template);
+    /*sp->buffer_fd = mkstemp(template);*/
+   /* sp->buffer_fd = open(template,O_RDWR|O_CREAT,600);
     if (sp->buffer_fd == -1) {
         i_errno = IECREATESTREAM;
         free(sp->result);
@@ -3212,8 +3223,11 @@ iperf_new_stream(struct iperf_test *test, int s)
         free(sp->result);
         free(sp);
         return NULL;
-    }
-    sp->buffer = (char *) mmap(NULL, test->settings->blksize, PROT_READ|PROT_WRITE, MAP_PRIVATE, sp->buffer_fd, 0);
+    }*/
+    /*
+     * Because temporary files are not created,need to ignore sp->buffer_fd and establish anonymous mappings.
+     */
+    sp->buffer = (char *) mmap(NULL, test->settings->blksize, PROT_READ|PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, sp->buffer_fd, 0);
     if (sp->buffer == MAP_FAILED) {
         i_errno = IECREATESTREAM;
         free(sp->result);
@@ -3244,8 +3258,13 @@ iperf_new_stream(struct iperf_test *test, int s)
         sp->diskfile_fd = -1;
 
     /* Initialize stream */
-    if ((readentropy(sp->buffer, test->settings->blksize) < 0) ||
-        (iperf_init_stream(sp, test) < 0)) {
+    /*
+     * There are no /dev/urandom files in the VxWorks operating system, 
+     * so remove the readentropy function and replace random numbers with quantity.
+     */
+    /*if ((readentropy(sp->buffer, test->settings->blksize) < 0) ||
+        (iperf_init_stream(sp, test) < 0)) {*/
+      if(iperf_init_stream(sp, test) < 0) {
         close(sp->buffer_fd);
         munmap(sp->buffer, sp->test->settings->blksize);
         free(sp->result);
@@ -3507,74 +3526,6 @@ iperf_json_finish(struct iperf_test *test)
     cJSON_Delete(test->json_top);
     test->json_top = test->json_start = test->json_connected = test->json_intervals = test->json_server_output = test->json_end = NULL;
     return 0;
-}
-
-
-/* CPU affinity stuff - Linux and FreeBSD only. */
-
-int
-iperf_setaffinity(struct iperf_test *test, int affinity)
-{
-#if defined(HAVE_SCHED_SETAFFINITY)
-    cpu_set_t cpu_set;
-
-    CPU_ZERO(&cpu_set);
-    CPU_SET(affinity, &cpu_set);
-    if (sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set) != 0) {
-	i_errno = IEAFFINITY;
-        return -1;
-    }
-    return 0;
-#elif defined(HAVE_CPUSET_SETAFFINITY)
-    cpuset_t cpumask;
-
-    if(cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID, -1,
-                          sizeof(cpuset_t), &test->cpumask) != 0) {
-        i_errno = IEAFFINITY;
-        return -1;
-    }
-
-    CPU_ZERO(&cpumask);
-    CPU_SET(affinity, &cpumask);
-
-    if(cpuset_setaffinity(CPU_LEVEL_WHICH,CPU_WHICH_PID, -1,
-                          sizeof(cpuset_t), &cpumask) != 0) {
-        i_errno = IEAFFINITY;
-        return -1;
-    }
-    return 0;
-#else /* neither HAVE_SCHED_SETAFFINITY nor HAVE_CPUSET_SETAFFINITY */
-    i_errno = IEAFFINITY;
-    return -1;
-#endif /* neither HAVE_SCHED_SETAFFINITY nor HAVE_CPUSET_SETAFFINITY */
-}
-
-int
-iperf_clearaffinity(struct iperf_test *test)
-{
-#if defined(HAVE_SCHED_SETAFFINITY)
-    cpu_set_t cpu_set;
-    int i;
-
-    CPU_ZERO(&cpu_set);
-    for (i = 0; i < CPU_SETSIZE; ++i)
-	CPU_SET(i, &cpu_set);
-    if (sched_setaffinity(0, sizeof(cpu_set_t), &cpu_set) != 0) {
-	i_errno = IEAFFINITY;
-        return -1;
-    }
-    return 0;
-#elif defined(HAVE_CPUSET_SETAFFINITY)
-    if(cpuset_setaffinity(CPU_LEVEL_WHICH,CPU_WHICH_PID, -1,
-                          sizeof(cpuset_t), &test->cpumask) != 0) {
-        i_errno = IEAFFINITY;
-        return -1;
-    }
-    return 0;
-#else /* neither HAVE_SCHED_SETAFFINITY nor HAVE_CPUSET_SETAFFINITY */
-    i_errno = IEAFFINITY;
-    return -1;
-#endif /* neither HAVE_SCHED_SETAFFINITY nor HAVE_CPUSET_SETAFFINITY */
 }
 
 int

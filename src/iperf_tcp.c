@@ -176,6 +176,11 @@ iperf_tcp_listen(struct iperf_test *test)
 	else {
 	    hints.ai_family = test->settings->domain;
 	}
+	/*
+	 * The VxWorks operating system does not support IPv6 at this time.
+	 * so add "hints.ai_family = AF_INET;".
+	 */
+		hints.ai_family = AF_INET;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_flags = AI_PASSIVE;
         if (getaddrinfo(test->bind_address, portstr, &hints, &res) != 0) {

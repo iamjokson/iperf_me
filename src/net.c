@@ -37,7 +37,11 @@
 #include <assert.h>
 #include <netdb.h>
 #include <string.h>
-#include <sys/fcntl.h>
+#include <fcntl.h>
+/*
+ * In order to support IOCTL function in vxWorks,add#include <ioLib.h>
+ */
+#include <ioLib.h>
 
 #ifdef HAVE_SENDFILE
 #ifdef linux
@@ -72,38 +76,25 @@ int
 timeout_connect(int s, const struct sockaddr *name, socklen_t namelen,
     int timeout)
 {
-	struct pollfd pfd;
-	socklen_t optlen;
-	int flags, optval;
 	int ret;
-
-	flags = 0;
-	if (timeout != -1) {
+	int unsigned long ul;
+	/*if (timeout != -1) {
 		flags = fcntl(s, F_GETFL, 0);
 		if (fcntl(s, F_SETFL, flags | O_NONBLOCK) == -1)
 			return -1;
+	}*/
+	if (timeout != -1) {
+		if(ioctl(s,FIONBIO,&ul) < 0)
+			printf("set non blocking failed\n");
 	}
-
 	if ((ret = connect(s, name, namelen)) != 0 && errno == EINPROGRESS) {
-		pfd.fd = s;
-		pfd.events = POLLOUT;
-		if ((ret = poll(&pfd, 1, timeout)) == 1) {
-			optlen = sizeof(optval);
-			if ((ret = getsockopt(s, SOL_SOCKET, SO_ERROR,
-			    &optval, &optlen)) == 0) {
-				errno = optval;
-				ret = optval == 0 ? 0 : -1;
-			}
-		} else if (ret == 0) {
+
+		if (ret == 0) {
 			errno = ETIMEDOUT;
 			ret = -1;
 		} else
 			ret = -1;
 	}
-
-	if (timeout != -1 && fcntl(s, F_SETFL, flags) == -1)
-		ret = -1;
-
 	return (ret);
 }
 
@@ -197,6 +188,11 @@ netannounce(int domain, int proto, char *local, int port)
     else {
 	hints.ai_family = domain;
     }
+    /*
+     * The VxWorks operating system does not support IPv6 at this time.
+     * so add "hints.ai_family = AF_INET;".
+     */
+    hints.ai_family = AF_INET;
     hints.ai_socktype = proto;
     hints.ai_flags = AI_PASSIVE;
     if (getaddrinfo(local, portstr, &hints, &res) != 0)
@@ -476,25 +472,16 @@ set_tcp_options(int sock, int no_delay, int mss)
 }
 
 /****************************************************************************/
-
+/*
+ * Because the fcntl function does not have F_GETFL and F_SETFL parameters in the VxWorks operating system,
+ * it is replaced by the IOCTL function.
+ */
 int
-setnonblocking(int fd, int nonblocking)
+setnonblocking(int fd, int unsigned long ul)
 {
-    int flags, newflags;
-
-    flags = fcntl(fd, F_GETFL, 0);
-    if (flags < 0) {
-        perror("fcntl(F_GETFL)");
-        return -1;
-    }
-    if (nonblocking)
-	newflags = flags | (int) O_NONBLOCK;
-    else
-	newflags = flags & ~((int) O_NONBLOCK);
-    if (newflags != flags)
-	if (fcntl(fd, F_SETFL, newflags) < 0) {
-	    perror("fcntl(F_SETFL)");
-	    return -1;
+	if(ioctl(fd,FIONBIO,&ul) < 0)
+	{
+		printf("set non blocking failed\n");
 	}
     return 0;
 }

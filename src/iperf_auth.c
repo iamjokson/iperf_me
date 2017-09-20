@@ -32,7 +32,6 @@
 #include <time.h>
 #include <sys/types.h>
 #include <stdio.h>
-#include <termios.h>
 
 #if defined(HAVE_SSL)
 
@@ -276,37 +275,5 @@ int decode_auth_setting(int enable_debug, char *authtoken, const char *private_k
 }
 
 #endif //HAVE_SSL
-
-ssize_t iperf_getpass (char **lineptr, size_t *n, FILE *stream) {
-    struct termios old, new;
-    ssize_t nread;
-
-    /* Turn echoing off and fail if we can't. */
-    if (tcgetattr (fileno (stream), &old) != 0)
-        return -1;
-    new = old;
-    new.c_lflag &= ~ECHO;
-    if (tcsetattr (fileno (stream), TCSAFLUSH, &new) != 0)
-        return -1;
-
-    /* Read the password. */
-    printf("Password: ");
-    nread = getline (lineptr, n, stream);
-
-    /* Restore terminal. */
-    (void) tcsetattr (fileno (stream), TCSAFLUSH, &old);
-
-    //strip the \n or \r\n chars
-    char *buf = *lineptr;
-    int i;
-    for (i = 0; buf[i] != '\0'; i++){
-        if (buf[i] == '\n' || buf[i] == '\r'){
-            buf[i] = '\0';
-            break;
-        }
-    }
-
-    return nread;
-}
 
 

@@ -337,7 +337,11 @@ typedef struct
 static unsigned char* ensure(printbuffer * const p, size_t needed)
 {
     unsigned char *newbuffer = NULL;
-    size_t newsize = 0;
+    /*
+     * Remove warnings "overflow in implicit constant conversion"when executing "newsize = LLONG_MAX;",
+     * replace int with uint64_t*
+     */
+    uint64_t newsize = 0;
 
     if ((p == NULL) || (p->buffer == NULL))
     {

@@ -180,6 +180,7 @@ iperf_handle_message_server(struct iperf_test *test)
             break;
         case TEST_END:
 	    test->done = 1;
+            cpu_util(test->cpu_util);
             test->stats_callback(test);
             SLIST_FOREACH(sp, &test->streams, streams) {
                 FD_CLR(sp->socket, &test->read_set);
@@ -204,7 +205,7 @@ iperf_handle_message_server(struct iperf_test *test)
 	    // Temporarily be in DISPLAY_RESULTS phase so we can get
 	    // ending summary statistics.
 	    signed char oldstate = test->state;
-
+	    cpu_util(test->cpu_util);
 	    test->state = DISPLAY_RESULTS;
 	    test->reporter_callback(test);
 	    test->state = oldstate;
@@ -459,10 +460,7 @@ iperf_run_server(struct iperf_test *test)
     struct iperf_stream *sp;
     struct timeval now;
     struct timeval* timeout;
-    /*
-     * The iperf_setaffinity function has been removed because it is not suitable.
-     * The detailed reason is before the iperf_setaffinity function.
-     */
+
    /* if (test->affinity != -1) 
 	if (iperf_setaffinity(test, test->affinity) != 0)
 	    return -2;*/
@@ -485,6 +483,10 @@ iperf_run_server(struct iperf_test *test)
     if (iperf_server_listen(test) < 0) {
         return -2;
     }
+
+    // Begin calculating CPU utilization
+    cpu_util(NULL);
+
     test->state = IPERF_START;
     streams_accepted = 0;
 
@@ -592,12 +594,13 @@ iperf_run_server(struct iperf_test *test)
 			    setnonblocking(s, 1);
 			}
 
-				streams_accepted++;
-				if (test->on_new_stream)
-					test->on_new_stream(sp);
-			}
-			FD_CLR(test->prot_listener, &read_set);
-		}
+                        streams_accepted++;
+                        if (test->on_new_stream)
+                            test->on_new_stream(sp);
+                    }
+                    FD_CLR(test->prot_listener, &read_set);
+                }
+
                 if (streams_accepted == test->num_streams) {
                     if (test->protocol->id != Ptcp) {
                         FD_CLR(test->prot_listener, &test->read_set);
@@ -679,10 +682,7 @@ iperf_run_server(struct iperf_test *test)
     } 
 
     iflush(test);
-    /*
-     * The iperf_clearaffinity function has been removed because it is not suitable.
-     * The detailed reason is before the iperf_clearaffinity function.
-     */
+
    /* if (test->server_affinity != -1) 
 	if (iperf_clearaffinity(test) != 0)
 	    return -1;*/

@@ -135,13 +135,17 @@ run(struct iperf_test *test)
 
     switch (test->role) {
         case 's':
-	    if (test->daemon) {
+        /*
+         * By looking at the help documentation and searching in the include file,
+         *  there is no daemon function API in VxWorks.
+         */
+	    /*if (test->daemon) {
 		int rc = daemon(0, 0);
 		if (rc < 0) {
 		    i_errno = IEDAEMON;
 		    iperf_errexit(test, "error - %s", iperf_strerror(i_errno));
 		}
-	    }
+	    }*/
 	    if (iperf_create_pidfile(test) < 0) {
 		i_errno = IEPIDFILE;
 		iperf_errexit(test, "error - %s", iperf_strerror(i_errno));

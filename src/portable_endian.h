@@ -139,7 +139,7 @@
 // the truth because we use the homebrew htonll, et al. implementations
 // that were originally the sole implementation of this functionality
 // in iperf 3.0.
-#	warning platform not supported
+
 #	include <endian.h>
 #if BYTE_ORDER == BIG_ENDIAN
 #define HTONLL(n) (n)

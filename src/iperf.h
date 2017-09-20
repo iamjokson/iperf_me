@@ -41,7 +41,6 @@
 
 #if defined(HAVE_CPUSET_SETAFFINITY)
 #include <sys/param.h>
-#include <sys/cpuset.h>
 #endif /* HAVE_CPUSET_SETAFFINITY */
 
 #include "timer.h"
@@ -52,7 +51,7 @@ typedef uint64_t iperf_size_t;
 
 struct iperf_interval_results
 {
-    iperf_size_t bytes_transferred; /* bytes transfered in this interval */
+    long unsigned bytes_transferred; /* bytes transfered in this interval */
     struct timeval interval_start_time;
     struct timeval interval_end_time;
     float     interval_duration;

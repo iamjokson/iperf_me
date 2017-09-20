@@ -90,7 +90,8 @@ int readentropy(void *out, size_t outsize)
 void
 make_cookie(char *cookie)
 {
-    unsigned char *out = (unsigned char*)cookie;
+	char *out = (char*)cookie;
+    /*unsigned char *out = (unsigned char*)cookie;
     size_t pos;
     static const unsigned char rndchars[] = "abcdefghijklmnopqrstuvwxyz234567";
 
@@ -98,7 +99,8 @@ make_cookie(char *cookie)
     for (pos = 0; pos < (COOKIE_SIZE - 1); pos++) {
         out[pos] = rndchars[out[pos] % (sizeof(rndchars) - 1)];
     }
-    out[pos] = '\0';
+    out[pos] = '\0';*/
+    sprintf(out,"%s","abcdefghijklmnopqrstuvwxyz234567");
 }
 
 

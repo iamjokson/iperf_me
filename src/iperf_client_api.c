@@ -34,8 +34,13 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/select.h>
-#include <sys/uio.h>
 #include <arpa/inet.h>
+/*
+ * Remove warnings when executing the "FD_ZERO(&test->write_set)" statement
+ * add #include <vxWorks.h> #include <strings.h>
+ */
+#include <vxWorks.h>
+#include <strings.h>
 
 #include "iperf.h"
 #include "iperf_api.h"
@@ -313,9 +318,8 @@ iperf_handle_message_client(struct iperf_test *test)
 int
 iperf_connect(struct iperf_test *test)
 {
-    FD_ZERO(&test->read_set);
     FD_ZERO(&test->write_set);
-
+    FD_ZERO(&test->read_set);
     make_cookie(test->cookie);
 
     /* Create and connect the control channel */
@@ -428,9 +432,13 @@ iperf_run_client(struct iperf_test * test)
     struct timeval* timeout = NULL;
     struct iperf_stream *sp;
 
-    if (test->affinity != -1)
+    /*
+     * The iperf_setaffinity function has been removed because it is not suitable.
+     * The detailed reason is before the iperf_setaffinity function.
+     */
+    /* if (test->affinity != -1)
 	if (iperf_setaffinity(test, test->affinity) != 0)
-	    return -1;
+	    return -1;*/
 
     if (test->json_output)
 	if (iperf_json_start(test) < 0)
